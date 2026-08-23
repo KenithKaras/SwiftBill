@@ -87,5 +87,18 @@ The `invoices` table stores all generated billing records.
 - **Client Portal**: Allow clients to view all their historic invoices via a secure link.
 - **AI Receipts**: Automatically extract invoice items from uploaded receipt photos.
 
+## 🔒 Production Security Recommendations
+
+For production environments, it is recommended to deliver the Content Security Policy (CSP) and security settings via HTTP headers in your hosting configuration (e.g. Netlify Headers, Vercel Headers, Firebase hosting config, or Nginx configuration) instead of hardcoding them inside `<meta>` HTML tags. This maintains clean local development and maximizes browser compatibility.
+
+### Recommended Headers:
+```http
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: https: http:; frame-ancestors 'none';
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: geolocation=(), microphone=(), camera=()
+```
+
 ---
 *SwiftBill - Professional Invoicing, simplified.*

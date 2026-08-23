@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { logger } from './logger';
 
 const getSupabaseConfig = () => {
   const url = import.meta.env.VITE_SUPABASE_URL;
@@ -7,9 +8,9 @@ const getSupabaseConfig = () => {
 };
 
 // Lazy initialize the client to prevent crashing on startup when keys are missing
-let _supabase: any = null;
+let _supabase: SupabaseClient | null = null;
 
-export const supabase = new Proxy({} as any, {
+export const supabase = new Proxy({} as SupabaseClient, {
   get: (target, prop) => {
     if (!_supabase) {
       const { url, key } = getSupabaseConfig();
@@ -17,7 +18,7 @@ export const supabase = new Proxy({} as any, {
       if (!url || !key) {
         // Return a dummy object for auth/storage if keys are missing to prevent total UI crash,
         // but throw error on actual database/auth operations.
-        console.error('Supabase configuration missing (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)');
+        logger.error('Supabase configuration missing (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)');
         
         // If it's a known property access like auth or from, provide a dummy that returns a promise rejection
         if (prop === 'auth' || prop === 'from') {
@@ -36,3 +37,4 @@ export const supabase = new Proxy({} as any, {
     return typeof value === 'function' ? value.bind(_supabase) : value;
   }
 });
+

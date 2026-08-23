@@ -1,65 +1,108 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  FilePlus, 
-  History, 
-  Settings, 
+import {
+  LayoutDashboard,
+  FilePlus,
+  History,
+  Package,
+  Settings,
   LogOut,
-  Receipt
+  User
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
+import { motion } from 'motion/react';
 
 const Sidebar = () => {
   const navigate = useNavigate();
+  const { businessData, user, signOut } = useAuth();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     navigate('/login');
   };
 
   const navItems = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/create', icon: FilePlus, label: 'Create Invoice' },
-    { to: '/history', icon: History, label: 'Invoice History' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
+    { to: '/dashboard/create', icon: FilePlus, label: 'Create invoice', end: false },
+    { to: '/dashboard/history', icon: History, label: 'Invoice history', end: false },
+    { to: '/dashboard/products', icon: Package, label: 'Products', end: false },
+    { to: '/dashboard/settings', icon: Settings, label: 'Settings', end: false },
   ];
 
   return (
-    <div className="w-64 bg-white border-r border-slate-200 h-screen flex flex-col sticky top-0">
-      <div className="p-6 flex items-center gap-3">
-        <div className="bg-blue-600 text-white p-2 rounded-lg">
-          <Receipt size={24} />
+    <div className="w-64 bg-paper border-r border-hairline h-screen flex flex-col sticky top-0 z-40 select-none">
+      {/* Brand */}
+      <div className="px-6 h-20 flex items-center gap-3 border-b border-hairline">
+        <div className="w-9 h-9 rounded-sm bg-ink text-paper flex items-center justify-center font-display font-bold text-sm tracking-tight">
+          SB
         </div>
-        <span className="font-bold text-xl tracking-tight">SwiftBill</span>
+        <div className="flex flex-col leading-none">
+          <span className="font-display font-semibold text-[15px] text-ink tracking-tight">SwiftBill</span>
+          <span className="text-[10px] text-grey uppercase tracking-[0.18em] mt-1">Invoicing</span>
+        </div>
       </div>
 
-      <nav className="flex-1 px-4 py-4 space-y-1">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) => cn(
-              "flex items-center gap-3 px-4 py-3 text-sm transition-colors",
-              isActive 
-                ? "nav-link-active" 
-                : "nav-link-inactive"
-            )}
-          >
-            <item.icon size={20} />
-            {item.label}
-          </NavLink>
-        ))}
+      {/* Navigation */}
+      <nav className="flex-1 px-3 pt-6">
+        <p className="px-3 mb-2 text-[10px] font-semibold text-grey uppercase tracking-[0.18em]">Menu</p>
+        <div className="space-y-0.5">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) => cn(
+                "flex items-center gap-3 px-3 py-2.5 text-sm rounded relative transition-colors",
+                isActive
+                  ? "text-paper font-semibold"
+                  : "text-slate-500 hover:text-ink hover:bg-slate-100 font-medium"
+              )}
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <motion.div
+                      layoutId="sidebar-active"
+                      className="absolute inset-0 bg-ink rounded -z-10"
+                      transition={{ type: "spring", stiffness: 400, damping: 34 }}
+                    />
+                  )}
+                  <item.icon size={17} strokeWidth={2} />
+                  <span>{item.label}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
       </nav>
 
-      <div className="p-4 border-t border-slate-100">
+      {/* Footer — account + sign out */}
+      <div className="p-3 border-t border-hairline">
+        <div className="flex items-center gap-3 px-2 py-2.5">
+          <div className="w-9 h-9 rounded-sm bg-slate-100 overflow-hidden border border-hairline flex items-center justify-center shrink-0">
+            {businessData?.businessLogo ? (
+              <img src={businessData.businessLogo} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <User size={17} className="text-grey" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold text-ink truncate leading-tight">
+              {businessData?.businessName || user?.email?.split('@')[0]}
+            </p>
+            <p className="text-[11px] text-grey truncate mt-0.5">
+              {user?.email}
+            </p>
+          </div>
+        </div>
+
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+          className="mt-1 flex items-center gap-3 w-full px-3 py-2.5 rounded text-sm font-medium text-slate-500 hover:text-negative hover:bg-red-50 transition-colors"
         >
-          <LogOut size={20} />
-          Logout
+          <LogOut size={16} strokeWidth={2} />
+          Sign out
         </button>
       </div>
     </div>

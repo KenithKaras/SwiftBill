@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Receipt, Mail, Lock, ArrowRight, User as UserIcon } from 'lucide-react';
+import { Mail, Lock, ArrowRight, ShieldCheck, FileText } from 'lucide-react';
+import { motion } from 'motion/react';
+import FormInput from '../components/ui/FormInput';
+import PasswordStrength, { isPasswordStrong } from '../components/ui/PasswordStrength';
+import { logger } from '../lib/logger';
+import { useAuth } from '../context/AuthContext';
 
 const Signup = () => {
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -12,29 +18,53 @@ const Signup = () => {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
+  // Redirect to dashboard if user is already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      return setError('Passwords do not match');
-    }
-    setLoading(true);
     setError('');
+
+    if (!isPasswordStrong(password)) {
+      return setError('Please satisfy all password strength requirements.');
+    }
+
+    if (password !== confirmPassword) {
+      return setError('Passwords do not match.');
+    }
+
+    setLoading(true);
     setSuccess(false);
+
     try {
       const { data, error: authError } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
       });
-      if (authError) throw authError;
-      
+
+      if (authError) {
+        logger.error('Signup auth query error', authError);
+        if (authError.message.toLowerCase().includes('user already registered')) {
+          throw new Error('This email is already associated with an account. Please sign in.');
+        } else if (authError.message.toLowerCase().includes('rate limit')) {
+          throw new Error('Verification email rate limit exceeded. (Local Dev Tip: Turn off "Confirm email" in your Supabase Auth -> Providers -> Email dashboard to sign up instantly without emails).');
+        } else {
+          throw new Error(`Signup failed: ${authError.message}`);
+        }
+      }
+
       if (data.user && !data.session) {
         setSuccess(true);
       } else {
-        navigate('/');
+        navigate('/dashboard');
       }
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Failed to create account');
+      logger.error('Signup catch error', err);
+      setError(err.message || 'An error occurred during account creation.');
     } finally {
       setLoading(false);
     }
@@ -42,98 +72,163 @@ const Signup = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-        <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 p-10 text-center space-y-6">
-          <div className="bg-emerald-100 text-emerald-600 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto">
-            <Mail size={32} />
+      <div className="min-h-screen flex items-center justify-center bg-paper px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-sm w-full bg-surface rounded border border-hairline shadow-sm shadow-black/3 p-8 sm:p-10 text-center space-y-6"
+        >
+          <div className="bg-accent-soft text-accent border border-hairline w-14 h-14 rounded flex items-center justify-center mx-auto">
+            <Mail size={26} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900">Confirm your email</h2>
-          <p className="text-slate-500">We've sent a confirmation link to <span className="font-bold text-slate-900 font-mono">{email}</span>. Please check your inbox and click the link to activate your account.</p>
-          <Link to="/login" className="block w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-100">
-            Back to Login
+          <div className="space-y-2">
+            <h2 className="font-display text-2xl font-semibold text-ink tracking-[-0.02em]">Verify your email</h2>
+            <p className="text-[11px] text-grey font-semibold uppercase tracking-[0.16em]">Confirmation link sent</p>
+          </div>
+          <p className="text-ink-soft text-sm leading-relaxed">
+            We sent a verification link to <span className="font-medium text-ink font-mono text-xs bg-paper px-2 py-0.5 rounded-sm border border-hairline">{email}</span>. Click it to finish setting up your account.
+          </p>
+          <Link
+            to="/login"
+            className="block w-full bg-ink text-paper py-3.5 rounded font-medium text-sm hover:bg-accent transition-colors cursor-pointer text-center"
+          >
+            Return to sign in
           </Link>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden">
-        <div className="p-10 pb-0 flex flex-col items-center">
-          <div className="bg-blue-600 text-white p-4 rounded-2xl mb-8 shadow-lg shadow-blue-200">
-            <Receipt size={32} />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight text-center">Create Account</h1>
-          <p className="text-slate-500 mt-3 font-medium text-center">Start your premium billing journey today</p>
+    <div className="min-h-screen flex bg-paper">
+      {/* Left column: brand panel (ink) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-ink text-paper relative overflow-hidden flex-col justify-between p-16">
+        <div className="flex items-center gap-2.5 relative z-10">
+          <div className="bg-paper text-ink w-9 h-9 rounded-sm flex items-center justify-center font-display font-semibold">SB</div>
+          <span className="font-display font-semibold text-xl tracking-tight">SwiftBill</span>
         </div>
 
-        <form onSubmit={handleSignup} className="p-10 space-y-6">
-          {error && (
-            <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm border border-red-100 font-medium">
-              {error}
-            </div>
-          )}
-          
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.1em] ml-1">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
-                type="email"
-                required
-                className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-600 transition-all font-medium"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+        <div className="relative z-10 max-w-lg my-auto space-y-12">
+          <div className="space-y-5">
+            <span className="text-[11px] font-semibold text-paper/50 uppercase tracking-[0.16em]">Get started</span>
+            <h1 className="font-display text-4xl xl:text-5xl font-semibold tracking-[-0.02em] leading-[1.08]">
+              Scale your invoicing<br />
+              <span className="text-paper/55">without the overhead.</span>
+            </h1>
+            <p className="text-paper/60 text-sm leading-relaxed max-w-md">
+              Create an account in seconds and set up branded letterheads, invoice defaults, and custom colors.
+            </p>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.1em] ml-1">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
-                type="password"
-                required
-                className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-600 transition-all font-medium"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+          <div className="space-y-6">
+            <div className="flex items-start gap-4">
+              <div className="bg-paper/5 border border-paper/10 p-2.5 rounded-sm text-paper mt-0.5">
+                <FileText size={18} />
+              </div>
+              <div>
+                <h4 className="font-medium text-sm text-paper">Professional templates</h4>
+                <p className="text-xs text-paper/55 mt-1 leading-relaxed">Modern, classic, or minimal PDF templates, branded with your logo and color.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="bg-paper/5 border border-paper/10 p-2.5 rounded-sm text-paper mt-0.5">
+                <ShieldCheck size={18} />
+              </div>
+              <div>
+                <h4 className="font-medium text-sm text-paper">Private by default</h4>
+                <p className="text-xs text-paper/55 mt-1 leading-relaxed">Row-Level Security ensures only you can read or write your documents.</p>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.1em] ml-1">Confirm Password</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
-                type="password"
-                required
-                className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-600 transition-all font-medium"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
+        <div className="relative z-10 text-xs text-paper/40 flex justify-between">
+          <span>&copy; 2026 SwiftBill</span>
+          <span className="hover:text-paper/70 transition-colors cursor-pointer">Security &amp; Privacy</span>
+        </div>
+      </div>
+
+      {/* Right column: form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12 md:p-16">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="max-w-sm w-full"
+        >
+          <div className="flex items-center gap-2.5 mb-10 lg:hidden">
+            <div className="bg-ink text-paper w-9 h-9 rounded-sm flex items-center justify-center font-display font-semibold">SB</div>
+            <span className="font-display font-semibold text-xl tracking-tight text-ink">SwiftBill</span>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 flex items-center justify-center gap-3 group disabled:opacity-70 mt-4 active:scale-[0.98]"
-          >
-            {loading ? 'Creating Account...' : 'Get Started Now'}
-            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-          </button>
+          <div className="mb-8">
+            <h1 className="font-display text-3xl font-semibold text-ink tracking-[-0.02em]">Create account</h1>
+            <p className="text-grey mt-2 text-sm">Get started with billing management.</p>
+          </div>
 
-          <p className="text-center text-sm text-slate-500 font-medium pt-2">
-            Already have an account? {' '}
-            <Link to="/login" className="text-blue-600 font-bold hover:underline">Log in here</Link>
-          </p>
-        </form>
+          <form onSubmit={handleSignup} className="space-y-4">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-50 text-negative p-4 rounded border border-hairline text-xs font-medium leading-relaxed"
+              >
+                {error}
+              </motion.div>
+            )}
+
+            <FormInput
+              label="Email Address"
+              type="email"
+              required
+              disabled={loading}
+              placeholder="you@example.com"
+              value={email}
+              onChange={setEmail}
+              icon={<Mail size={16} />}
+            />
+
+            <FormInput
+              label="Password"
+              type="password"
+              required
+              disabled={loading}
+              placeholder="••••••••"
+              value={password}
+              onChange={setPassword}
+              icon={<Lock size={16} />}
+            />
+
+            <PasswordStrength password={password} />
+
+            <FormInput
+              label="Confirm Password"
+              type="password"
+              required
+              disabled={loading}
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              icon={<Lock size={16} />}
+            />
+
+            <motion.button
+              type="submit"
+              disabled={loading || !isPasswordStrong(password)}
+              whileTap={{ scale: (loading || !isPasswordStrong(password)) ? 1 : 0.99 }}
+              className="w-full bg-ink hover:bg-accent text-paper py-3.5 rounded font-medium text-sm transition-colors flex items-center justify-center gap-2 group disabled:opacity-60 disabled:hover:bg-ink mt-2 cursor-pointer"
+            >
+              {loading ? 'Creating account…' : 'Create account'}
+              {!loading && <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />}
+            </motion.button>
+
+            <p className="text-center text-sm text-grey pt-4">
+              Already have an account?{' '}
+              <Link to="/login" className="text-accent font-medium hover:underline">Sign in</Link>
+            </p>
+          </form>
+        </motion.div>
       </div>
     </div>
   );
